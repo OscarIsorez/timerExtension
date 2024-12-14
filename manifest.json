@@ -2,14 +2,23 @@
     "manifest_version": 3,
     "name": "Time Redirector",
     "version": "1.0",
-    "permissions": ["storage", "tabs", "activeTab"],
+    "permissions": [
+        "storage",
+        "tabs",
+        "activeTab",
+        "scripting",
+        "webNavigation"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
     "background": {
-      "service_worker": "background.js"
+        "service_worker": "background.js",
+        "type": "module"
     },
     "action": {
-      "default_popup": "popup.html",
-      "default_icon": "icon.png"
+        "default_popup": "popup.html",
+        "default_icon": "icon.png"
     },
-    
     "options_page": "options.html"
-  }
+}
