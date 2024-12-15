@@ -1,7 +1,7 @@
 // Structure pour stocker les timers par site et par tab
 const timers = {
     // tabId: {
-    //    siteUrl: { timeLeft: number, timer: Timer }
+    //    siteUrl: { timeLeft: number, timer: Timer, redirectUntil: timestamp }
     // }
 };
 
@@ -37,8 +37,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
                                     chrome.tabs.update(tabId, { url: redirectSites[0] });
                                 }
                                 delete timers[tabId][matchedSite];
-                            }, timeLimit * 1000)
+                            }, timeLimit * 1000),
+                            redirectUntil: null
                         };
+                    }
+                } else {
+                    // Timer existe
+                    const siteTimer = timers[tabId][matchedSite];
+                    
+                    // Vérifier si le timer est à 0 et si la période de redirection est active
+                    if (siteTimer.timeLeft <= 0 && siteTimer.redirectUntil && Date.now() < siteTimer.redirectUntil) {
+                        // Rediriger vers le premier site de redirection
+                        if (redirectSites.length > 0) {
+                            chrome.tabs.update(tabId, { url: redirectSites[0] });
+                        }
                     }
                 }
             }
@@ -57,29 +69,46 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
-        chrome.storage.local.set({ timeLimit: message.timeLimit });
+        const { timeLimit, tabId, site } = message;
+        
+        if (!timers[tabId]) {
+            timers[tabId] = {};
+        }
+        
+        timers[tabId][site] = {
+            timeLeft: timeLimit,
+            timer: setInterval(() => {
+                if (timers[tabId][site].timeLeft > 0) {
+                    timers[tabId][site].timeLeft--;
+                } else if (!timers[tabId][site].redirectUntil) {
+                    // Définir la période de redirection de 5 minutes
+                    timers[tabId][site].redirectUntil = Date.now() + (5 * 60 * 1000);
+                }
+            }, 1000),
+            redirectUntil: null
+        };
+        
         sendResponse({ success: true });
     }
+    
     if (message.action === 'getTimer') {
-        const tab = message.tabId;
-        const url = message.url;
-
+        const { tabId, url } = message;
         chrome.storage.local.get(['controlled'], (data) => {
             const controlledSites = data.controlled || [];
             const matchedSite = controlledSites.find(site => url.includes(site));
-
-            if (matchedSite && timers[tab] && timers[tab][matchedSite]) {
+            
+            if (matchedSite && timers[tabId] && timers[tabId][matchedSite]) {
                 sendResponse({
-                    timeLeft: Math.ceil(timers[tab][matchedSite].timeLeft)
+                    timeLeft: Math.ceil(timers[tabId][matchedSite].timeLeft),
+                    redirectUntil: timers[tabId][matchedSite].redirectUntil
                 });
             } else {
                 sendResponse({ timeLeft: undefined });
             }
         });
-        return true; // Keep the message channel open for async response
+        return true;
     }
 });
-
 
 setInterval(() => {
     Object.keys(timers).forEach(tabId => {
@@ -90,4 +119,3 @@ setInterval(() => {
         });
     });
 }, 1000);
-
