@@ -51,28 +51,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             timers[tabId] = {};
         }
 
+        // Clear existing timer if any
+        if (timers[tabId][site] && timers[tabId][site].timer) {
+            clearInterval(timers[tabId][site].timer);
+        }
+
         timers[tabId][site] = {
             timeLeft: timeLimit,
-            timer: setInterval(() => {
+            timer: setInterval(async () => {
+                console.log(`Timer for ${site}: ${timers[tabId][site].timeLeft}`); // Debug log
+
                 if (timers[tabId][site].timeLeft > 0) {
                     timers[tabId][site].timeLeft--;
 
-                    // When timer hits 0
                     if (timers[tabId][site].timeLeft === 0) {
-                        // Set redirect period
+                        // Immediately set redirect period
                         timers[tabId][site].redirectUntil = Date.now() + (5 * 60 * 1000);
 
-                        // Get redirect URL and perform redirect
-                        chrome.storage.local.get(['redirect'], (data) => {
+                        // Get redirect sites and perform immediate redirect
+                        try {
+                            const data = await chrome.storage.local.get(['redirect']);
                             const redirectSites = data.redirect || [];
+
                             if (redirectSites.length > 0) {
-                                let formattedUrl = formatUrl(redirectSites[0]);
-                                chrome.tabs.update(tabId, { url: formattedUrl });
+                                const formattedUrl = formatUrl(redirectSites[0]);
+                                console.log(`Redirecting to: ${formattedUrl}`); // Debug log
+                                await chrome.tabs.update(tabId, { url: formattedUrl });
                             }
-                        });
+                        } catch (error) {
+                            console.error('Redirect error:', error);
+                        }
                     }
                 } else if (timers[tabId][site].redirectUntil && Date.now() >= timers[tabId][site].redirectUntil) {
-                    // Cleanup timer after redirect period ends
+                    console.log('Cleanup timer'); // Debug log
                     clearInterval(timers[tabId][site].timer);
                     delete timers[tabId][site];
                 }
@@ -81,6 +92,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         };
 
         sendResponse({ success: true });
+        return true; // Keep message channel open for async response
     }
 
     if (message.action === 'getTimer') {
@@ -131,8 +143,3 @@ function formatUrl(url) {
 
     return url;
 }
-
-// Example usage:
-// formatUrl("google") -> "https://google.com"
-// formatUrl("www.blablacar.fr") -> "https://www.blablacar.fr"
-// formatUrl("https://facebook") -> "https://facebook.com"

@@ -1,3 +1,7 @@
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('minutes').focus();
+});
+
 document.getElementById('confirm').addEventListener('click', () => {
     const minutes = parseInt(document.getElementById('minutes').value);
     if (minutes > 0) {
