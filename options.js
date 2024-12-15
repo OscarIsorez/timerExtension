@@ -18,6 +18,7 @@ document.getElementById('add-controlled').addEventListener('click', () => {
         const updated = [...(data.controlled || []), url];
         chrome.storage.local.set({ controlled: updated }, updateLists);
     });
+    controlledInput.value = '';
 });
 
 document.getElementById('add-redirect').addEventListener('click', () => {
@@ -27,6 +28,7 @@ document.getElementById('add-redirect').addEventListener('click', () => {
         const updated = [...(data.redirect || []), url];
         chrome.storage.local.set({ redirect: updated }, updateLists);
     });
+    redirectInput.value = '';
 });
 
 updateLists();

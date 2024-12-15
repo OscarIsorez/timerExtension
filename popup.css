@@ -3,3 +3,22 @@ html {
     min-width: 10em;
     background: salmon;
 }
+
+#timer-container {
+    text-align: center;
+    padding: 1em;
+    background: white;
+    border-radius: 0.5em;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#timer-container h2 {
+    margin: 0;
+    font-size: 1.5em;
+    color: darkslategray;
+}
+
+#timer {
+    font-size: 2em;
+    color: darkred;
+}
