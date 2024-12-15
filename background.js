@@ -27,7 +27,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const tabDomain = tab.url
 
         // Match based on domain
-        const matchedSite = controlledSites.find(site => site === tabDomain);
+        console.log('Current site: ' + tabDomain);
+        console.log('Controlled sites: ' + controlledSites);
+        const matchedSite = controlledSites.find(site => tabDomain.includes(site));
 
         if (matchedSite) {
             // Check redirect state first

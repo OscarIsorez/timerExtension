@@ -58,7 +58,7 @@ document.getElementById('add-controlled').addEventListener('click', () => {
     const url = controlledInput.value.trim();
     if (!url) return;
     if (!isValidUrl(url)) {
-        showErrorMessage(controlledErrorMessage, 'Please enter a valid URL (https://example.com).');
+        showErrorMessage(controlledErrorMessage, 'Please enter a valid URL (https://www.example.com).');
         controlledInput.focus();
         return;
     }
@@ -76,7 +76,7 @@ document.getElementById('add-redirect').addEventListener('click', () => {
     const url = redirectInput.value.trim();
     if (!url) return;
     if (!isValidUrl(url)) {
-        showErrorMessage(redirectErrorMessage, 'Please enter a valid URL (https://example.com).');
+        showErrorMessage(redirectErrorMessage, 'Please enter a valid URL (https://www.example.com).');
         redirectInput.focus();
         return;
     }
