@@ -26,9 +26,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const redirectSites = data.redirect || [];
         const tabDomain = tab.url
 
-        // Match based on domain
-        console.log('Current site: ' + tabDomain);
-        console.log('Controlled sites: ' + controlledSites);
+
         const matchedSite = controlledSites.find(site => tabDomain.includes(site));
 
         if (matchedSite) {
@@ -76,16 +74,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         timers[tabId][domain] = {
             timeLeft: timeLimit,
             timer: setInterval(async () => {
-                // on affiche le site 
-                console.log('Current site: ' + site);
-                console.log('Redirecting back to original site' + timers[tabId][domain].redirectUntil >= Date.now());
-                console.log(`Timer for ${site}: ${timers[tabId][domain].timeLeft}`);
-                console.log(`Redirect until: ${timers[tabId][domain].redirectUntil}`);
-                console.log('Current time: ' + Date.now());
 
                 if (timers[tabId][domain].timeLeft > 0) {
-                    //  si l'url du site courant est dans la liste des sites contrôlés
-
                     timers[tabId][domain].timeLeft--;
 
                     // Update timer completion logic in setTimeLimit handler
@@ -101,9 +91,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             const redirectSites = data.redirect || [];
 
                             if (redirectSites.length > 0) {
-                                const formattedUrl = redirectSites[0];
-                                console.log(`Redirecting to: ${formattedUrl}`);
-                                await chrome.tabs.update(tabId, { url: formattedUrl });
+                                console.log(`Redirecting to: ${redirectSites[0]}`);
+                                await chrome.tabs.update(tabId, { url: redirectSites[0] });
                             }
                         } catch (error) {
                             console.error('Redirect error:', error);
@@ -116,16 +105,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     delete timers[tabId][domain];
                 }
                 else if (timers[tabId][domain].redirectUntil && Date.now() <= timers[tabId][domain].redirectUntil) {
-                    // redirecting to the first site in the redirect list
-                    const data = await chrome.storage.local.get(['redirect']);
-                    const redirectSites = data.redirect || [];
-                    if (redirectSites.length > 0) {
-                        const formattedUrl = redirectSites[0];
-                        console.log(`Redirecting to: ${formattedUrl}`);
-                        await chrome.tabs.update(tabId, { url: formattedUrl });
+                    // Check if the user is still on a controlled site before redirecting
+                    const tab = await chrome.tabs.get(tabId);
+                    const tabDomain = new URL(tab.url).hostname.replace('www.', '');
+                    const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
+                    const matchedSite = controlledSites.find(site => tabDomain.includes(site));
+
+                    if (matchedSite) {
+                        // redirecting to the first site in the redirect list
+                        const data = await chrome.storage.local.get(['redirect']);
+                        const redirectSites = data.redirect || [];
+                        if (redirectSites.length > 0) {
+                            const formattedUrl = formatUrl(redirectSites[0]);
+                            console.log(`Redirecting to: ${formattedUrl}`);
+                            try {
+                                await chrome.tabs.update(tabId, { url: formattedUrl });
+                            } catch (error) {
+                                console.error(`Failed to update tab with id ${tabId}:`, error);
+                            }
+                        }
                     }
-
-
                 }
 
             }, 1000),
