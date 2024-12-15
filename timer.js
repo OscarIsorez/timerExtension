@@ -18,3 +18,10 @@ document.getElementById('confirm').addEventListener('click', () => {
         });
     }
 });
+
+
+document.getElementById('minutes').addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        document.getElementById('confirm').click();
+    }
+});

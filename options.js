@@ -10,6 +10,18 @@ function updateLists() {
     });
 }
 
+// Ajouter les event listeners pour la touche Enter
+document.getElementById('controlled-input').addEventListener('keyup', (event) => {
+    if (event.key === 'Enter') {
+        document.getElementById('add-controlled').click();
+    }
+});
+
+document.getElementById('redirect-input').addEventListener('keyup', (event) => {
+    if (event.key === 'Enter') {
+        document.getElementById('add-redirect').click();
+    }
+});
 
 document.getElementById('add-controlled').addEventListener('click', () => {
     const url = controlledInput.value.trim();

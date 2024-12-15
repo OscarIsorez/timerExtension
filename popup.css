@@ -22,3 +22,20 @@ html {
     font-size: 2em;
     color: darkred;
 }
+
+#settings {
+    display: inline-block;
+    margin-top: 1em;
+    padding: 0.5em 1em;
+    background: darkslategray;
+    color: white;
+    border: none;
+    border-radius: 0.5em;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+}
+
+#settings:hover {
+    background: darkred;
+    transform: scale(1.1);
+}
