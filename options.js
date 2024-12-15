@@ -121,6 +121,24 @@ document.getElementById('redirect-input').addEventListener('keyup', (event) => {
     }
 });
 
+document.getElementById('controlled-input').addEventListener('focus', (event) => {
+    const input = event.target;
+    const value = input.value;
+    const start = value.indexOf('yourwebsite');
+    if (start !== -1) {
+        input.setSelectionRange(start, start + 'yourwebsite'.length);
+    }
+});
+
+document.getElementById('redirect-input').addEventListener('focus', (event) => {
+    const input = event.target;
+    const value = input.value;
+    const start = value.indexOf('yourwebsite');
+    if (start !== -1) {
+        input.setSelectionRange(start, start + 'yourwebsite'.length);
+    }
+});
+
 document.getElementById('add-controlled').addEventListener('click', () => {
     const url = controlledInput.value.trim();
     if (!url) return;
@@ -134,7 +152,7 @@ document.getElementById('add-controlled').addEventListener('click', () => {
         const updated = [...(data.controlled || []), domain];
         chrome.storage.local.set({ controlled: updated }, updateLists);
     });
-    controlledInput.value = '';
+    controlledInput.value = 'https://www.example.com';
     hideErrorMessage(controlledErrorMessage);
 });
 
@@ -150,9 +168,8 @@ document.getElementById('add-redirect').addEventListener('click', () => {
         const updated = [...(data.redirect || []), url];
         chrome.storage.local.set({ redirect: updated }, updateLists);
     });
-    redirectInput.value = '';
+    redirectInput.value = 'https://www.example.com';
     hideErrorMessage(redirectErrorMessage);
 });
 
 updateLists();
-
