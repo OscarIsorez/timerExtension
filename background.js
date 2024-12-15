@@ -1,6 +1,3 @@
-import { formatUrl } from './utils.js';
-
-
 // Structure pour stocker les timers par site et par tab
 const timers = {
     // tabId: {
@@ -21,12 +18,13 @@ async function getRedirectState(site) {
     return data[`redirect_${site}`];
 }
 
+// Update tabs.onUpdated listener
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
         const data = await chrome.storage.local.get(['controlled', 'redirect']);
         const controlledSites = data.controlled || [];
         const redirectSites = data.redirect || [];
-        const tabDomain = formatUrl(tab.url);
+        const tabDomain = tab.url
 
         // Match based on domain
         const matchedSite = controlledSites.find(site => site === tabDomain);
@@ -39,7 +37,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             if (redirectState && redirectState.until > now) {
                 // Still in redirect period - force redirect
                 if (redirectSites.length > 0) {
-                    const formattedUrl = formatUrl(redirectSites[0]);
+                    const formattedUrl = redirectSites[0];
                     await chrome.tabs.update(tabId, { url: formattedUrl });
                     return;
                 }
@@ -62,7 +60,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
         const { timeLimit, tabId, site } = message;
-        const domain = formatUrl(site);
+        const domain = site;
 
         if (!timers[tabId]) {
             timers[tabId] = {};
@@ -101,7 +99,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             const redirectSites = data.redirect || [];
 
                             if (redirectSites.length > 0) {
-                                const formattedUrl = formatUrl(redirectSites[0]);
+                                const formattedUrl = redirectSites[0];
                                 console.log(`Redirecting to: ${formattedUrl}`);
                                 await chrome.tabs.update(tabId, { url: formattedUrl });
                             }
@@ -120,7 +118,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const data = await chrome.storage.local.get(['redirect']);
                     const redirectSites = data.redirect || [];
                     if (redirectSites.length > 0) {
-                        const formattedUrl = formatUrl(redirectSites[0]);
+                        const formattedUrl = redirectSites[0];
                         console.log(`Redirecting to: ${formattedUrl}`);
                         await chrome.tabs.update(tabId, { url: formattedUrl });
                     }
@@ -154,5 +152,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 });
+
 
 

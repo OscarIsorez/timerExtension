@@ -57,3 +57,15 @@ button:hover {
 #redirect-list li {
     border-left: 4px solid #2196F3;
 }
+
+
+.error-message {
+    display: none;
+    color: #D8000C;
+    background-color: #FFBABA;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #D8000C;
+    border-radius: 4px;
+    text-align: center;
+}
