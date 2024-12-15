@@ -21,8 +21,14 @@
         "default_icon": "icon.png"
     },
     "options_page": "options.html",
-    "web_accessible_resources": [{
-        "resources": ["timer.html"],
-        "matches": ["<all_urls>"]
-    }]
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "timer.html"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
 }

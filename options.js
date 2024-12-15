@@ -1,3 +1,6 @@
+import { formatUrl } from './utils.js';
+
+
 const controlledList = document.getElementById('controlled-list');
 const redirectList = document.getElementById('redirect-list');
 const controlledInput = document.getElementById('controlled-input');
@@ -23,11 +26,15 @@ document.getElementById('redirect-input').addEventListener('keyup', (event) => {
     }
 });
 
+
 document.getElementById('add-controlled').addEventListener('click', () => {
     const url = controlledInput.value.trim();
     if (!url) return;
+    const domain = formatUrl(url);
+    console.log(domain);
+    if (!domain) return;
     chrome.storage.local.get(['controlled'], (data) => {
-        const updated = [...(data.controlled || []), url];
+        const updated = [...(data.controlled || []), domain];
         chrome.storage.local.set({ controlled: updated }, updateLists);
     });
     controlledInput.value = '';

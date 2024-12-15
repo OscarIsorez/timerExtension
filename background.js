@@ -1,3 +1,6 @@
+import { formatUrl } from './utils.js';
+
+
 // Structure pour stocker les timers par site et par tab
 const timers = {
     // tabId: {
@@ -5,88 +8,126 @@ const timers = {
     // }
 };
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+async function setRedirectState(site, until) {
+    await chrome.storage.local.set({
+        [`redirect_${site}`]: {
+            until: until
+        }
+    });
+}
+
+async function getRedirectState(site) {
+    const data = await chrome.storage.local.get([`redirect_${site}`]);
+    return data[`redirect_${site}`];
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
-        chrome.storage.local.get(['controlled', 'redirect'], (data) => {
-            const controlledSites = data.controlled || [];
-            const redirectSites = data.redirect || [];
-            const matchedSite = controlledSites.find(site => tab.url.includes(site));
+        const data = await chrome.storage.local.get(['controlled', 'redirect']);
+        const controlledSites = data.controlled || [];
+        const redirectSites = data.redirect || [];
+        const tabDomain = formatUrl(tab.url);
 
-            if (matchedSite) {
-                // Vérifier si un timer existe pour ce site
-                if (!timers[tabId] || !timers[tabId][matchedSite]) {
-                    // Pas de timer actif, rediriger vers timer.html
-                    chrome.storage.local.set({
-                        pendingUrl: tab.url,
-                        pendingSite: matchedSite
-                    }, () => {
-                        chrome.tabs.update(tabId, {
-                            url: chrome.runtime.getURL('timer.html')
-                        });
-                    });
-                } else {
-                    // Timer existe
-                    const siteTimer = timers[tabId][matchedSite];
+        // Match based on domain
+        const matchedSite = controlledSites.find(site => site === tabDomain);
 
-                    // Vérifier si le timer est à 0 et si la période de redirection est active
-                    if (siteTimer.timeLeft <= 0 && siteTimer.redirectUntil && Date.now() < siteTimer.redirectUntil) {
-                        // Rediriger vers le premier site de redirection
-                        if (redirectSites.length > 0) {
-                            let formattedUrl = formatUrl(redirectSites[0]);
+        if (matchedSite) {
+            // Check redirect state first
+            const redirectState = await getRedirectState(matchedSite);
+            const now = Date.now();
 
-                            chrome.tabs.update(tabId, { url: formattedUrl });
-                        }
-                    }
+            if (redirectState && redirectState.until > now) {
+                // Still in redirect period - force redirect
+                if (redirectSites.length > 0) {
+                    const formattedUrl = formatUrl(redirectSites[0]);
+                    await chrome.tabs.update(tabId, { url: formattedUrl });
+                    return;
                 }
             }
-        });
+
+            // Normal timer check
+            if (!timers[tabId] || !timers[tabId][matchedSite]) {
+                await chrome.storage.local.set({
+                    pendingUrl: tab.url,
+                    pendingSite: matchedSite
+                });
+                await chrome.tabs.update(tabId, {
+                    url: chrome.runtime.getURL('timer.html')
+                });
+            }
+        }
     }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
         const { timeLimit, tabId, site } = message;
+        const domain = formatUrl(site);
 
         if (!timers[tabId]) {
             timers[tabId] = {};
         }
 
         // Clear existing timer if any
-        if (timers[tabId][site] && timers[tabId][site].timer) {
-            clearInterval(timers[tabId][site].timer);
+        if (timers[tabId][domain] && timers[tabId][domain].timer) {
+            clearInterval(timers[tabId][domain].timer);
         }
 
-        timers[tabId][site] = {
+        timers[tabId][domain] = {
             timeLeft: timeLimit,
             timer: setInterval(async () => {
-                console.log(`Timer for ${site}: ${timers[tabId][site].timeLeft}`); // Debug log
+                // on affiche le site 
+                console.log('Current site: ' + site);
+                console.log('Redirecting back to original site' + timers[tabId][domain].redirectUntil >= Date.now());
+                console.log(`Timer for ${site}: ${timers[tabId][domain].timeLeft}`);
+                console.log(`Redirect until: ${timers[tabId][domain].redirectUntil}`);
+                console.log('Current time: ' + Date.now());
 
-                if (timers[tabId][site].timeLeft > 0) {
-                    timers[tabId][site].timeLeft--;
+                if (timers[tabId][domain].timeLeft > 0) {
+                    //  si l'url du site courant est dans la liste des sites contrôlés
 
-                    if (timers[tabId][site].timeLeft === 0) {
-                        // Immediately set redirect period
-                        timers[tabId][site].redirectUntil = Date.now() + (5 * 60 * 1000);
+                    timers[tabId][domain].timeLeft--;
 
-                        // Get redirect sites and perform immediate redirect
+                    // Update timer completion logic in setTimeLimit handler
+                    if (timers[tabId][domain].timeLeft === 0) {
+                        const redirectUntil = Date.now() + (5 * 60 * 1000);
+                        timers[tabId][domain].redirectUntil = redirectUntil;
+
+                        // Store redirect state
+                        await setRedirectState(site, redirectUntil);
+
                         try {
                             const data = await chrome.storage.local.get(['redirect']);
                             const redirectSites = data.redirect || [];
 
                             if (redirectSites.length > 0) {
                                 const formattedUrl = formatUrl(redirectSites[0]);
-                                console.log(`Redirecting to: ${formattedUrl}`); // Debug log
+                                console.log(`Redirecting to: ${formattedUrl}`);
                                 await chrome.tabs.update(tabId, { url: formattedUrl });
                             }
                         } catch (error) {
                             console.error('Redirect error:', error);
                         }
                     }
-                } else if (timers[tabId][site].redirectUntil && Date.now() >= timers[tabId][site].redirectUntil) {
-                    console.log('Cleanup timer'); // Debug log
-                    clearInterval(timers[tabId][site].timer);
-                    delete timers[tabId][site];
+                } else if (timers[tabId][domain].redirectUntil && Date.now() >= timers[tabId][domain].redirectUntil) {
+                    // Clean up redirect state when timer expires
+                    await chrome.storage.local.remove([`redirect_${site}`]);
+                    clearInterval(timers[tabId][domain].timer);
+                    delete timers[tabId][domain];
                 }
+                else if (timers[tabId][domain].redirectUntil && Date.now() <= timers[tabId][domain].redirectUntil) {
+                    // redirecting to the first site in the redirect list
+                    const data = await chrome.storage.local.get(['redirect']);
+                    const redirectSites = data.redirect || [];
+                    if (redirectSites.length > 0) {
+                        const formattedUrl = formatUrl(redirectSites[0]);
+                        console.log(`Redirecting to: ${formattedUrl}`);
+                        await chrome.tabs.update(tabId, { url: formattedUrl });
+                    }
+
+
+                }
+
             }, 1000),
             redirectUntil: null
         };
@@ -114,32 +155,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// Nettoyage des timers quand un onglet est fermé
-chrome.tabs.onRemoved.addListener((tabId) => {
-    if (timers[tabId]) {
-        Object.values(timers[tabId]).forEach(siteTimer => {
-            clearInterval(siteTimer.timer);
-        });
-        delete timers[tabId];
-    }
-});
 
-function formatUrl(url) {
-    // Remove any whitespace
-    url = url.trim();
-
-    // Add https:// if no protocol specified
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-    }
-
-    // Add .com if no domain extension present
-    const commonExtensions = ['.com', '.org', '.net', '.edu', '.gov', '.fr'];
-    const hasExtension = commonExtensions.some(ext => url.includes(ext));
-
-    if (!hasExtension) {
-        url += '.com';
-    }
-
-    return url;
-}
