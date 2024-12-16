@@ -1,17 +1,9 @@
 const controlledWebsites = {};
 
-async function setRedirectState(site, until) {
-    await chrome.storage.local.set({
-        [`redirect_${site}`]: {
-            until: until
-        }
-    });
-}
 
-async function getRedirectState(site) {
-    const data = await chrome.storage.local.get([`redirect_${site}`]);
-    return data[`redirect_${site}`];
-}
+
+
+
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
@@ -23,10 +15,19 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const matchedSite = controlledSites.find(site_name => url.includes(site_name));
 
         if (matchedSite) {
-            const redirectState = await getRedirectState(matchedSite);
+            const redirectState = null
+            try {
+
+                redirectState = controlledWebsites[matchedSite].redirectUntil
+            }
+            catch (error) {
+            }
+            console.log("controlledWebsites", controlledWebsites)
+
+
             const now = Date.now();
 
-            if (redirectState && redirectState.until > now) {
+            if (redirectState && redirectState > now) {
                 if (redirectSites.length > 0) {
 
                     await chrome.tabs.update(tabId, { url: redirectSites[0] });
@@ -62,6 +63,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         controlledWebsites[site] = {
             timeLeft: timeLimit,
             timer: setInterval(async () => {
+
+                console.log('Timer:', controlledWebsites[site].timeLeft);
+                console.log('Storage:', await chrome.storage.local.get(null));
                 if (controlledWebsites[site].timeLeft > 0) {
                     controlledWebsites[site].timeLeft--;
 
@@ -69,7 +73,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         const redirectUntil = Date.now() + (5 * 60 * 1000);
                         controlledWebsites[site].redirectUntil = redirectUntil;
 
-                        await setRedirectState(site, redirectUntil);
 
                         try {
                             const data = await chrome.storage.local.get(['redirect']);
@@ -89,7 +92,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                     }
                 } else if (controlledWebsites[site].redirectUntil && Date.now() >= controlledWebsites[site].redirectUntil) {
-                    await chrome.storage.local.remove([`redirect_${site}`]);
+                    await setRedirectState(site, 0);
                     clearInterval(controlledWebsites[site].timer);
                     delete controlledWebsites[site];
                 } else if (controlledWebsites[site].redirectUntil && Date.now() <= controlledWebsites[site].redirectUntil) {
