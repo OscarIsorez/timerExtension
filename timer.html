@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Set Timer</title>
     <meta charset="UTF-8">
@@ -7,14 +8,16 @@
         body {
             width: 300px;
             margin: 20px auto;
-            text-align: center; 
+            text-align: center;
             font-family: Arial, sans-serif;
         }
+
         input {
             width: 100px;
             padding: 8px;
             margin: 10px;
         }
+
         button {
             padding: 8px 20px;
             background: #4CAF50;
@@ -25,10 +28,12 @@
         }
     </style>
 </head>
+
 <body>
-    <h2>Définir le temps limite</h2>
+    <h2>Définir le temps limite pour : <span id="hostname"></span></h2>
     <input type="number" id="minutes" placeholder="Minutes">
     <button id="confirm">Confirmer</button>
     <script src="timer.js"></script>
 </body>
+
 </html>

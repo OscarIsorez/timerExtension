@@ -1,5 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('minutes').focus();
+
+    // Récupérer pendingUrl et afficher le hostname
+    chrome.storage.local.get(['pendingUrl'], (data) => {
+        if (data.pendingUrl) {
+            const url = new URL(data.pendingUrl);
+            const hostname = url.hostname;
+            document.getElementById('hostname').textContent = hostname;
+
+            // Console.log du storage
+            chrome.storage.local.get(null, (storageData) => {
+                console.log('Chrome storage:', storageData);
+            });
+        }
+    });
 });
 
 document.getElementById('confirm').addEventListener('click', () => {
@@ -23,9 +37,9 @@ document.getElementById('confirm').addEventListener('click', () => {
     }
 });
 
-
 document.getElementById('minutes').addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
         document.getElementById('confirm').click();
     }
 });
+    
