@@ -20,12 +20,11 @@ function updateLists() {
         addEventListeners();
     });
 }
-
 function createListItem(url, type) {
     return `
-        <li draggable="true">
-            <span class="drag-handle">☰</span>
+        <li>
             ${url}
+            ${type === 'redirect' ? `<button class="go-btn" data-url="${url}">Go to</button>` : ''}
             <button class="delete-btn" data-url="${url}" data-type="${type}">Supprimer</button>
         </li>
     `;
@@ -57,55 +56,20 @@ function addEventListeners() {
             removeUrl(url, type);
         });
     });
-
-    document.querySelectorAll('li[draggable="true"]').forEach(item => {
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragover', handleDragOver);
-        item.addEventListener('drop', handleDrop);
-        item.addEventListener('dragend', handleDragEnd);
+    document.querySelectorAll('.go-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const url = event.target.getAttribute('data-url');
+            chrome.tabs.create({ url: url });
+        });
     });
 }
+
 
 function removeUrl(url, type) {
     chrome.storage.local.get([type], (data) => {
         const updated = (data[type] || []).filter(item => item !== url);
         chrome.storage.local.set({ [type]: updated }, updateLists);
     });
-}
-
-let draggedItem = null;
-
-function handleDragStart(event) {
-    draggedItem = event.target;
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/html', event.target.innerHTML);
-}
-
-function handleDragOver(event) {
-    if (event.preventDefault) {
-        event.preventDefault();
-    }
-    return false;
-}
-
-function handleDrop(event) {
-    if (event.stopPropagation) {
-        event.stopPropagation();
-    }
-
-    if (draggedItem !== event.target) {
-        draggedItem.innerHTML = event.target.innerHTML;
-        event.target.innerHTML = event.dataTransfer.getData('text/html');
-
-        const type = event.target.querySelector('.delete-btn').getAttribute('data-type');
-        const items = Array.from(document.querySelectorAll(`#${type}-list li`)).map(li => li.textContent.trim());
-        chrome.storage.local.set({ [type]: items }, updateLists);
-    }
-    return false;
-}
-
-function handleDragEnd(event) {
-    draggedItem = null;
 }
 
 // Ajouter les event listeners pour la touche Enter
@@ -121,29 +85,11 @@ document.getElementById('redirect-input').addEventListener('keyup', (event) => {
     }
 });
 
-document.getElementById('controlled-input').addEventListener('focus', (event) => {
-    const input = event.target;
-    const value = input.value;
-    const start = value.indexOf('yourwebsite');
-    if (start !== -1) {
-        input.setSelectionRange(start, start + 'yourwebsite'.length);
-    }
-});
-
-document.getElementById('redirect-input').addEventListener('focus', (event) => {
-    const input = event.target;
-    const value = input.value;
-    const start = value.indexOf('yourwebsite');
-    if (start !== -1) {
-        input.setSelectionRange(start, start + 'yourwebsite'.length);
-    }
-});
 
 document.getElementById('add-controlled').addEventListener('click', () => {
     const url = controlledInput.value.trim();
-    if (!url) return;
-    if (!isValidUrl(url)) {
-        showErrorMessage(controlledErrorMessage, 'Please enter a valid URL (https://www.example.com).');
+    if (!url) {
+        showErrorMessage(controlledErrorMessage, 'Please enter something.');
         controlledInput.focus();
         return;
     }
@@ -152,7 +98,7 @@ document.getElementById('add-controlled').addEventListener('click', () => {
         const updated = [...(data.controlled || []), domain];
         chrome.storage.local.set({ controlled: updated }, updateLists);
     });
-    controlledInput.value = 'https://www.example.com';
+    controlledInput.value = '';
     hideErrorMessage(controlledErrorMessage);
 });
 
