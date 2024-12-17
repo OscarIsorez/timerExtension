@@ -1,4 +1,4 @@
-const controlledWebsites = {};
+const memory = {};
 
 
 
@@ -18,7 +18,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             const redirectUntil = null
             try {
 
-                redirectUntil = controlledWebsites[matchedSite].redirectUntil
+                redirectUntil = memory[matchedSite].redirectUntil
             }
             catch (error) {
             }
@@ -37,7 +37,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 }
             }
 
-            if (!controlledWebsites[matchedSite]) {
+            if (!memory[matchedSite]) {
                 await chrome.storage.local.set({
                     pendingUrl: tab.url,
                     pendingSite: matchedSite
@@ -54,26 +54,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
         const { timeLimit, tabId, site } = message;
 
-        if (!controlledWebsites[site]) {
-            controlledWebsites[site] = {};
+
+        if (!memory[site]) {
+            memory[site] = {};
         }
 
-        if (controlledWebsites[site].timer) {
-            clearInterval(controlledWebsites[site].timer);
+        if (memory[site].timer) {
+            clearInterval(memory[site].timer);
         }
 
-        controlledWebsites[site] = {
+        memory[site] = {
             timeLeft: timeLimit,
             timer: setInterval(async () => {
 
-                console.log('Timer:', controlledWebsites[site].timeLeft);
-                console.log('Storage:', await chrome.storage.local.get(null));
-                if (controlledWebsites[site].timeLeft > 0) {
-                    controlledWebsites[site].timeLeft--;
+                if (memory[site].timeLeft > 0) {
+                    console.log('cache memory :', memory);
 
-                    if (controlledWebsites[site].timeLeft === 0) {
+                    memory[site].timeLeft--;
+
+                    if (memory[site].timeLeft === 0) {
                         const redirectUntil = Date.now() + (5 * 60 * 1000);
-                        controlledWebsites[site].redirectUntil = redirectUntil;
+                        memory[site].redirectUntil = redirectUntil;
 
 
                         try {
@@ -93,10 +94,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             console.error('Redirect error:', error);
                         }
                     }
-                } else if (controlledWebsites[site].redirectUntil && Date.now() >= controlledWebsites[site].redirectUntil) {
-                    clearInterval(controlledWebsites[site].timer);
-                    delete controlledWebsites[site];
-                } else if (controlledWebsites[site].redirectUntil && Date.now() <= controlledWebsites[site].redirectUntil) {
+                } else if (memory[site].redirectUntil && Date.now() >= memory[site].redirectUntil) {
+                    clearInterval(memory[site].timer);
+                } else if (memory[site].redirectUntil && Date.now() <= memory[site].redirectUntil) {
                     const tab = await chrome.tabs.get(tabId).catch(error => {
                         return null;
                     });
@@ -133,10 +133,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const controlledSites = data.controlled || [];
             const matchedSite = controlledSites.find(site => url.includes(site));
 
-            if (matchedSite && controlledWebsites[matchedSite]) {
+            if (matchedSite && memory[matchedSite]) {
                 sendResponse({
-                    timeLeft: Math.ceil(controlledWebsites[matchedSite].timeLeft),
-                    redirectUntil: controlledWebsites[matchedSite].redirectUntil
+                    timeLeft: Math.ceil(memory[matchedSite].timeLeft),
+                    redirectUntil: memory[matchedSite].redirectUntil
                 });
             } else {
                 sendResponse({ timeLeft: undefined });
@@ -147,26 +147,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Fonction appelée lorsque le timer d'un site atteint zéro
-async function handleTimeUp(site) {
+async function getGlobalState(site) {
     const data = await chrome.storage.local.get(['globalMode', 'controlled']);
     const globalMode = data.globalMode || false;
-    const controlledSites = data.controlled || [];
-
-    if (globalMode) {
-        // Bloquer tous les sites contrôlés
-        for (let controlledSite of controlledSites) {
-            if (controlledWebsites[controlledSite]) {
-                clearInterval(controlledWebsites[controlledSite].timer);
-                delete controlledWebsites[controlledSite];
-            }
-            // Logiciel pour rediriger ou bloquer le site
-        }
-    } else {
-        // Bloquer uniquement le site en question
-        if (controlledWebsites[site]) {
-            clearInterval(controlledWebsites[site].timer);
-            delete controlledWebsites[site];
-            // Logiciel pour rediriger ou bloquer le site
-        }
-    }
+    return globalMode;
 }
