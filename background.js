@@ -2,10 +2,11 @@ const memory = {};
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
-        const data = await chrome.storage.local.get(['controlled', 'redirect', 'siteRedirects']);
+        const data = await chrome.storage.local.get(['controlled', 'redirect', 'siteRedirects', 'globalRedirectUntil']);
         const controlledSites = data.controlled || [];
         const redirectSites = data.redirect || [];
         const siteRedirects = data.siteRedirects || {};
+        const globalRedirectUntil = data.globalRedirectUntil;
         const url = tab.url;
 
         const matchedSite = controlledSites.find(site_name => url.includes(site_name));
@@ -13,8 +14,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         if (matchedSite) {
             const now = Date.now();
             const redirectUntil = siteRedirects[matchedSite];
+            const globalMode = await getGlobalState(matchedSite);
 
-            if (redirectUntil && now <= redirectUntil) {
+            if ((globalMode && globalRedirectUntil && now <= globalRedirectUntil) ||
+                (!globalMode && redirectUntil && now <= redirectUntil)) {
                 if (redirectSites.length > 0) {
                     await chrome.tabs.update(tabId, { url: redirectSites[0] });
                     return;
@@ -25,7 +28,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 // Nettoyage du storage si le temps est expiré
                 const updatedSiteRedirects = { ...siteRedirects };
                 delete updatedSiteRedirects[matchedSite];
-                await chrome.storage.local.set({ siteRedirects: updatedSiteRedirects });
+                await chrome.storage.local.set({
+                    siteRedirects: updatedSiteRedirects,
+                    globalRedirectUntil: null
+                });
             }
 
             if (!memory[matchedSite]) {
@@ -57,7 +63,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             timeLeft: timeLimit,
             timer: setInterval(async () => {
                 console.log('cache memory :', memory);
-                const globalMode = await getGlobalState(site);
                 console.log('now ', Date.now());
                 if (memory[site].timeLeft > 0) {
                     memory[site].timeLeft--;
@@ -67,14 +72,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         const redirectUntil = Date.now() + (5 * 60 * 1000);
                         memory[site].redirectUntil = redirectUntil;
 
+                        const globalMode = await getGlobalState(site);
+
                         // Stocker dans le storage local
                         const currentRedirects = (await chrome.storage.local.get(['siteRedirects'])).siteRedirects || {};
-                        await chrome.storage.local.set({
-                            siteRedirects: {
-                                ...currentRedirects,
-                                [site]: redirectUntil
-                            }
-                        });
+                        if (globalMode) {
+                            // En mode global, on applique le redirectUntil à tous les sites contrôlés
+                            const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
+                            const globalRedirects = {};
+                            controlledSites.forEach(site => {
+                                globalRedirects[site] = redirectUntil;
+                            });
+
+                            await chrome.storage.local.set({
+                                siteRedirects: {
+                                    ...currentRedirects,
+                                    ...globalRedirects
+                                },
+                                globalRedirectUntil: redirectUntil
+                            });
+                        } else {
+                            await chrome.storage.local.set({
+                                siteRedirects: {
+                                    ...currentRedirects,
+                                    [site]: redirectUntil
+                                }
+                            });
+                        }
 
                         try {
                             const data = await chrome.storage.local.get(['redirect']);
@@ -148,9 +172,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// Fonction appelée lorsque le timer d'un site atteint zéro
 async function getGlobalState(site) {
-    const data = await chrome.storage.local.get(['globalMode', 'controlled']);
-    const globalMode = data.globalMode || false;
-    return globalMode;
+    const { globalMode, globalRedirectUntil } = await chrome.storage.local.get(['globalMode', 'globalRedirectUntil']);
+    return globalMode && globalRedirectUntil && Date.now() <= globalRedirectUntil;
 }
+
