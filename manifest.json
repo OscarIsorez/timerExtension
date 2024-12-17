@@ -25,15 +25,5 @@
         "default_popup": "popup.html",
         "default_icon": "icons/ICON_512.png"
     },
-    "options_page": "options.html",
-    "web_accessible_resources": [
-        {
-            "resources": [
-                "timer.html"
-            ],
-            "matches": [
-                "<all_urls>"
-            ]
-        }
-    ]
+    "options_page": "options.html"
 }
