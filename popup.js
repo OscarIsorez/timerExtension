@@ -96,4 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('settings').addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
     });
+
+    // Charger l'état du Global mode
+    chrome.storage.local.get('globalMode', function(data) {
+        document.getElementById('global-mode-switch').checked = data.globalMode || false;
+    });
+});
+
+document.getElementById('global-mode-switch').addEventListener('change', function(e) {
+    const isGlobalMode = e.target.checked;
+    chrome.storage.local.set({ 'globalMode': isGlobalMode });
 });

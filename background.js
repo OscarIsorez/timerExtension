@@ -15,23 +15,25 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const matchedSite = controlledSites.find(site_name => url.includes(site_name));
 
         if (matchedSite) {
-            const redirectState = null
+            const redirectUntil = null
             try {
 
-                redirectState = controlledWebsites[matchedSite].redirectUntil
+                redirectUntil = controlledWebsites[matchedSite].redirectUntil
             }
             catch (error) {
             }
-            console.log("controlledWebsites", controlledWebsites)
 
 
             const now = Date.now();
 
-            if (redirectState && redirectState > now) {
+            if (redirectUntil && redirectUntil < now) {
                 if (redirectSites.length > 0) {
 
                     await chrome.tabs.update(tabId, { url: redirectSites[0] });
                     return;
+                }
+                else {
+                    alert('No redirect site set');
                 }
             }
 
@@ -92,7 +94,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                     }
                 } else if (controlledWebsites[site].redirectUntil && Date.now() >= controlledWebsites[site].redirectUntil) {
-                    await setRedirectState(site, 0);
                     clearInterval(controlledWebsites[site].timer);
                     delete controlledWebsites[site];
                 } else if (controlledWebsites[site].redirectUntil && Date.now() <= controlledWebsites[site].redirectUntil) {
@@ -144,3 +145,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 });
+
+// Fonction appelée lorsque le timer d'un site atteint zéro
+async function handleTimeUp(site) {
+    const data = await chrome.storage.local.get(['globalMode', 'controlled']);
+    const globalMode = data.globalMode || false;
+    const controlledSites = data.controlled || [];
+
+    if (globalMode) {
+        // Bloquer tous les sites contrôlés
+        for (let controlledSite of controlledSites) {
+            if (controlledWebsites[controlledSite]) {
+                clearInterval(controlledWebsites[controlledSite].timer);
+                delete controlledWebsites[controlledSite];
+            }
+            // Logiciel pour rediriger ou bloquer le site
+        }
+    } else {
+        // Bloquer uniquement le site en question
+        if (controlledWebsites[site]) {
+            clearInterval(controlledWebsites[site].timer);
+            delete controlledWebsites[site];
+            // Logiciel pour rediriger ou bloquer le site
+        }
+    }
+}
