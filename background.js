@@ -70,33 +70,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const currentState = await chrome.storage.local.get(['siteStates']);
                     const updatedSiteStates = currentState.siteStates;
 
-                    if (updatedSiteStates[site].timeLeft > 0) {
+                    if (updatedSiteStates[site] && updatedSiteStates[site].timeLeft && updatedSiteStates[site].timeLeft > 0) {
                         updatedSiteStates[site].timeLeft--;
 
                         if (updatedSiteStates[site].timeLeft === 0) {
                             const redirectUntil = Date.now() + (5 * 60 * 1000);
                             updatedSiteStates[site].redirectUntil = redirectUntil;
 
-                            const globalMode = await getGlobaMode();
 
-                            if (globalMode) {
-                                const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
-                                controlledSites.forEach(controlledSite => {
-                                    if (!updatedSiteStates[controlledSite]) {
-                                        updatedSiteStates[controlledSite] = {};
-                                    }
-                                    updatedSiteStates[controlledSite].redirectUntil = redirectUntil;
-                                });
+                            await chrome.storage.local.set({
+                                siteStates: updatedSiteStates
+                            });
 
-                                await chrome.storage.local.set({
-                                    siteStates: updatedSiteStates,
-                                    globalRedirectUntil: redirectUntil
-                                });
-                            } else {
-                                await chrome.storage.local.set({
-                                    siteStates: updatedSiteStates
-                                });
-                            }
 
                             const redirectData = await chrome.storage.local.get(['redirect']);
                             const redirectSites = redirectData.redirect || [];
@@ -141,3 +126,20 @@ async function getGlobaMode() {
     const { globalMode } = await chrome.storage.local.get(['globalMode']);
     return globalMode
 }
+function logStorageState() {
+    setInterval(async () => {
+        const data = await chrome.storage.local.get(null);
+        console.clear();
+        console.log('=== Storage State ===');
+        console.log('Controlled Sites:', data.controlled);
+        console.log('Redirect Sites:', data.redirect);
+        console.log('Global Mode:', data.globalMode);
+        console.log('Site States:', JSON.stringify(data.siteStates, null, 2));
+        console.log('Now:', Date.now());
+        console.log('==================');
+    }, 1000
+    );
+}
+
+// Démarrer le logging
+logStorageState();
