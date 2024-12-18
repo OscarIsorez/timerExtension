@@ -57,47 +57,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const { timeLimit, tabId, site } = message;
 
         chrome.storage.local.get(['siteStates'], async (data) => {
-            console.log(data);
             const siteStates = data.siteStates || {};
 
-            if (siteStates[site] && siteStates[site].intervalId) {
-                clearInterval(siteStates[site].intervalId);
-            }
-
+            // Stocker le timestamp de fin au lieu d'utiliser un interval
             siteStates[site] = {
                 timeLeft: timeLimit,
-                intervalId: setInterval(async () => {
-                    const currentState = await chrome.storage.local.get(['siteStates']);
-                    const updatedSiteStates = currentState.siteStates;
-
-                    if (updatedSiteStates[site] && updatedSiteStates[site].timeLeft && updatedSiteStates[site].timeLeft > 0) {
-                        updatedSiteStates[site].timeLeft--;
-
-                        if (updatedSiteStates[site].timeLeft === 0) {
-                            const redirectUntil = Date.now() + (5 * 60 * 1000);
-                            updatedSiteStates[site].redirectUntil = redirectUntil;
-
-
-                            await chrome.storage.local.set({
-                                siteStates: updatedSiteStates
-                            });
-
-
-                            const redirectData = await chrome.storage.local.get(['redirect']);
-                            const redirectSites = redirectData.redirect || [];
-
-                            if (redirectSites.length > 0) {
-                                chrome.tabs.update(tabId, { url: redirectSites[0] });
-                            }
-                        }
-
-                        await chrome.storage.local.set({ siteStates: updatedSiteStates });
-                    }
-                }, 1000)
+                endTime: Date.now() + (timeLimit * 1000)
             };
 
             await chrome.storage.local.set({ siteStates });
             sendResponse({ success: true });
+
+            // Créer un seul interval pour tous les sites
+            if (!window.globalInterval) {
+                window.globalInterval = setInterval(async () => {
+                    const currentState = await chrome.storage.local.get(['siteStates']);
+                    const updatedSiteStates = currentState.siteStates || {};
+                    const now = Date.now();
+
+                    let hasChanges = false;
+
+                    // Mettre à jour tous les timers
+                    for (const [site, state] of Object.entries(updatedSiteStates)) {
+                        if (state.endTime) {
+                            const newTimeLeft = Math.ceil((state.endTime - now) / 1000);
+
+                            if (newTimeLeft <= 0 && !state.redirectUntil) {
+                                state.timeLeft = 0;
+                                state.redirectUntil = now + (5 * 60 * 1000);
+                                hasChanges = true;
+
+                                const redirectData = await chrome.storage.local.get(['redirect']);
+                                const redirectSites = redirectData.redirect || [];
+                                if (redirectSites.length > 0) {
+                                    chrome.tabs.update(tabId, { url: redirectSites[0] });
+                                }
+                            } else if (newTimeLeft > 0) {
+                                state.timeLeft = newTimeLeft;
+                                hasChanges = true;
+                            }
+                        }
+                    }
+
+                    if (hasChanges) {
+                        await chrome.storage.local.set({ siteStates: updatedSiteStates });
+                    }
+                }, 1000);
+            }
         });
         return true;
     }
