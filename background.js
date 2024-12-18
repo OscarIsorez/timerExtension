@@ -1,42 +1,31 @@
-const memory = {};
-
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url) {
-        const data = await chrome.storage.local.get(['controlled', 'redirect', 'siteRedirects', 'globalRedirectUntil']);
+        const data = await chrome.storage.local.get(['controlled', 'redirect', 'siteStates']);
         const controlledSites = data.controlled || [];
         const redirectSites = data.redirect || [];
-        const siteRedirects = data.siteRedirects || {};
-        const globalRedirectUntil = data.globalRedirectUntil;
+        const siteStates = data.siteStates || {};
         const url = tab.url;
+        const now = Date.now();
 
         const matchedSite = controlledSites.find(site_name => url.includes(site_name));
 
         if (matchedSite) {
-            const now = Date.now();
-            const redirectUntil = siteRedirects[matchedSite];
             const globalMode = await getGlobalState(matchedSite);
+            const siteState = siteStates[matchedSite] || {};
 
-            if ((globalMode && globalRedirectUntil && now <= globalRedirectUntil) ||
-                (!globalMode && redirectUntil && now <= redirectUntil)) {
+            // Vérifier si le site est en période de redirection
+            if (siteState.redirectUntil && now <= siteState.redirectUntil) {
+                // Si oui, rediriger vers le premier site de redirection
                 if (redirectSites.length > 0) {
-                    await chrome.tabs.update(tabId, { url: redirectSites[0] });
+                    await chrome.tabs.update(tabId, {
+                        url: redirectSites[0]
+                    });
                     return;
-                } else {
-                    alert('No redirect site set');
                 }
-            } else if (redirectUntil && now > redirectUntil) {
-                // Nettoyage du storage si le temps est expiré
-                const updatedSiteRedirects = { ...siteRedirects };
-                delete updatedSiteRedirects[matchedSite];
-                await chrome.storage.local.set({
-                    siteRedirects: updatedSiteRedirects,
-                    globalRedirectUntil: null
-                });
             }
 
-            if (!memory[matchedSite] || memory[matchedSite].timeLeft === 0 || memory[matchedSite].redirectUntil && now <= memory[matchedSite].redirectUntil
-
-            ) {   // Changer la condition. si le site est déjà dans la mémoire, il faut également rediriger si le temps est écoulé
+            // Sinon, vérifier si un timer est nécessaire
+            if (!siteState.timeLeft || siteState.timeLeft === 0) {
                 await chrome.storage.local.set({
                     pendingUrl: tab.url,
                     pendingSite: matchedSite
@@ -45,7 +34,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                     url: chrome.runtime.getURL('timer.html')
                 });
             }
-
         }
     }
 });
@@ -54,118 +42,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
         const { timeLimit, tabId, site } = message;
 
-        if (!memory[site]) {
-            memory[site] = {};
-        }
+        chrome.storage.local.get(['siteStates'], async (data) => {
+            console.log(data);
+            const siteStates = data.siteStates || {};
 
-        if (memory[site].timer) {
-            clearInterval(memory[site].timer);
-        }
+            if (siteStates[site] && siteStates[site].intervalId) {
+                clearInterval(siteStates[site].intervalId);
+            }
 
-        memory[site] = {
-            timeLeft: timeLimit,
-            timer: setInterval(async () => {
-                console.log('cache memory :', memory);
-                console.log('now ', Date.now());
-                if (memory[site].timeLeft > 0) {
-                    memory[site].timeLeft--;
+            siteStates[site] = {
+                timeLeft: timeLimit,
+                intervalId: setInterval(async () => {
+                    const currentState = await chrome.storage.local.get(['siteStates']);
+                    const updatedSiteStates = currentState.siteStates;
 
-                    // Modifier la partie du setTimeLimit où le timer atteint 0
-                    if (memory[site].timeLeft === 0) {
-                        const redirectUntil = Date.now() + (5 * 60 * 1000);
-                        memory[site].redirectUntil = redirectUntil;
+                    if (updatedSiteStates[site].timeLeft > 0) {
+                        updatedSiteStates[site].timeLeft--;
 
-                        const globalMode = await getGlobalState(site);
+                        if (updatedSiteStates[site].timeLeft === 0) {
+                            const redirectUntil = Date.now() + (5 * 60 * 1000);
+                            updatedSiteStates[site].redirectUntil = redirectUntil;
 
-                        // Stocker dans le storage local
-                        const currentRedirects = (await chrome.storage.local.get(['siteRedirects'])).siteRedirects || {};
-                        if (globalMode) {
-                            // En mode global, on applique le redirectUntil à tous les sites contrôlés
-                            const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
-                            const globalRedirects = {};
-                            controlledSites.forEach(site => {
-                                globalRedirects[site] = redirectUntil;
-                            });
+                            const globalMode = await getGlobalState(site);
 
-                            await chrome.storage.local.set({
-                                siteRedirects: {
-                                    ...currentRedirects,
-                                    ...globalRedirects
-                                },
-                                globalRedirectUntil: redirectUntil
-                            });
-                        } else {
-                            await chrome.storage.local.set({
-                                siteRedirects: {
-                                    ...currentRedirects,
-                                    [site]: redirectUntil
-                                }
-                            });
-                        }
-
-                        try {
-                            const data = await chrome.storage.local.get(['redirect']);
-                            const redirectSites = data.redirect || [];
-                            if (redirectSites.length > 0) {
-                                try {
-                                    const tab = await chrome.tabs.get(tabId);
-                                    if (tab) {
-                                        await chrome.tabs.update(tabId, { url: redirectSites[0] });
+                            if (globalMode) {
+                                const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
+                                controlledSites.forEach(controlledSite => {
+                                    if (!updatedSiteStates[controlledSite]) {
+                                        updatedSiteStates[controlledSite] = {};
                                     }
-                                } catch (error) {
-                                    console.error('Failed to get or update tab:', error);
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Redirect error:', error);
-                        }
-                    }
-                } else if (memory[site].redirectUntil && Date.now() >= memory[site].redirectUntil) {
-                    clearInterval(memory[site].timer);
-                } else if (memory[site].redirectUntil && Date.now() <= memory[site].redirectUntil) {
-                    console.log('now < redirectUntil', memory[site].redirectUntil);
-                    const tab = await chrome.tabs.get(tabId).catch(error => {
-                        console.error('Failed to get tab:', error);
-                        return null;
-                    });
+                                    updatedSiteStates[controlledSite].redirectUntil = redirectUntil;
+                                });
 
-                    if (tab) {
-                        const url = tab.url;
-                        const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
-                        const matchedSite = controlledSites.find(site_name => url.includes(site_name));
-
-                        if (matchedSite) {
-                            const data = await chrome.storage.local.get(['redirect']);
-                            const redirectSites = data.redirect || [];
-                            if (redirectSites.length > 0) {
-                                try {
-                                    await chrome.tabs.update(tabId, { url: redirectSites[0] });
-                                } catch (error) {
-                                    console.error(`Failed to update tab with id ${tabId}:`, error);
-                                }
+                                await chrome.storage.local.set({
+                                    siteStates: updatedSiteStates,
+                                    globalRedirectUntil: redirectUntil
+                                });
                             } else {
-                                alert('No redirect site set');
+                                await chrome.storage.local.set({
+                                    siteStates: updatedSiteStates
+                                });
+                            }
+
+                            const redirectData = await chrome.storage.local.get(['redirect']);
+                            const redirectSites = redirectData.redirect || [];
+
+                            if (redirectSites.length > 0) {
+                                chrome.tabs.update(tabId, { url: redirectSites[0] });
                             }
                         }
-                    }
-                }
-            }, 1000)
-        };
 
-        sendResponse({ success: true });
+                        await chrome.storage.local.set({ siteStates: updatedSiteStates });
+                    }
+                }, 1000)
+            };
+
+            await chrome.storage.local.set({ siteStates });
+            sendResponse({ success: true });
+        });
         return true;
     }
 
     if (message.action === 'getTimer') {
         const { tabId, url } = message;
-        chrome.storage.local.get(['controlled'], (data) => {
+        chrome.storage.local.get(['controlled', 'siteStates'], (data) => {
             const controlledSites = data.controlled || [];
+            const siteStates = data.siteStates || {};
             const matchedSite = controlledSites.find(site => url.includes(site));
 
-            if (matchedSite && memory[matchedSite]) {
+            if (matchedSite && siteStates[matchedSite]) {
                 sendResponse({
-                    timeLeft: Math.ceil(memory[matchedSite].timeLeft),
-                    redirectUntil: memory[matchedSite].redirectUntil
+                    timeLeft: Math.ceil(siteStates[matchedSite].timeLeft),
+                    redirectUntil: siteStates[matchedSite].redirectUntil
                 });
             } else {
                 sendResponse({ timeLeft: undefined });
@@ -179,4 +127,3 @@ async function getGlobalState(site) {
     const { globalMode, globalRedirectUntil } = await chrome.storage.local.get(['globalMode', 'globalRedirectUntil']);
     return globalMode && globalRedirectUntil && Date.now() <= globalRedirectUntil;
 }
-
