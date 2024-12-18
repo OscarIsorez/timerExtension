@@ -34,7 +34,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 });
             }
 
-            if (!memory[matchedSite]) {
+            if (!memory[matchedSite] || memory[matchedSite].timeLeft === 0 || memory[matchedSite].redirectUntil && now <= memory[matchedSite].redirectUntil
+
+            ) {   // Changer la condition. si le site est déjà dans la mémoire, il faut également rediriger si le temps est écoulé
                 await chrome.storage.local.set({
                     pendingUrl: tab.url,
                     pendingSite: matchedSite
@@ -43,6 +45,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                     url: chrome.runtime.getURL('timer.html')
                 });
             }
+
         }
     }
 });
