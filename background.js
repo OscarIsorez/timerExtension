@@ -10,7 +10,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const matchedSite = controlledSites.find(site_name => url.includes(site_name));
 
         if (matchedSite) {
-            const globalMode = await getGlobalState(matchedSite);
+            const globalMode = await getGlobaMode();
             const siteState = siteStates[matchedSite] || {};
 
             // Vérifier le mode global d'abord
@@ -19,6 +19,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 const anySiteInRedirection = Object.values(siteStates).some(
                     state => state.redirectUntil && now <= state.redirectUntil
                 );
+                console.log('Any site in redirection:', anySiteInRedirection);
 
                 if (anySiteInRedirection && redirectSites.length > 0) {
                     await chrome.tabs.update(tabId, {
@@ -76,7 +77,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             const redirectUntil = Date.now() + (5 * 60 * 1000);
                             updatedSiteStates[site].redirectUntil = redirectUntil;
 
-                            const globalMode = await getGlobalState(site);
+                            const globalMode = await getGlobaMode();
 
                             if (globalMode) {
                                 const controlledSites = (await chrome.storage.local.get(['controlled'])).controlled || [];
@@ -136,7 +137,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-async function getGlobalState(site) {
-    const { globalMode, globalRedirectUntil } = await chrome.storage.local.get(['globalMode', 'globalRedirectUntil']);
-    return globalMode && globalRedirectUntil && Date.now() <= globalRedirectUntil;
+async function getGlobaMode() {
+    const { globalMode } = await chrome.storage.local.get(['globalMode']);
+    return globalMode
 }
