@@ -13,9 +13,23 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             const globalMode = await getGlobalState(matchedSite);
             const siteState = siteStates[matchedSite] || {};
 
-            // Vérifier si le site est en période de redirection
+            // Vérifier le mode global d'abord
+            if (globalMode) {
+                // Vérifier si n'importe quel site est en redirection
+                const anySiteInRedirection = Object.values(siteStates).some(
+                    state => state.redirectUntil && now <= state.redirectUntil
+                );
+
+                if (anySiteInRedirection && redirectSites.length > 0) {
+                    await chrome.tabs.update(tabId, {
+                        url: redirectSites[0]
+                    });
+                    return;
+                }
+            }
+
+            // Continuer avec la logique normale si pas de redirection globale
             if (siteState.redirectUntil && now <= siteState.redirectUntil) {
-                // Si oui, rediriger vers le premier site de redirection
                 if (redirectSites.length > 0) {
                     await chrome.tabs.update(tabId, {
                         url: redirectSites[0]
@@ -24,7 +38,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 }
             }
 
-            // Sinon, vérifier si un timer est nécessaire
             if (!siteState.timeLeft || siteState.timeLeft === 0) {
                 await chrome.storage.local.set({
                     pendingUrl: tab.url,
