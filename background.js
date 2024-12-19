@@ -59,7 +59,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.storage.local.get(['siteStates'], async (data) => {
             const siteStates = data.siteStates || {};
 
-            // Stocker le timestamp de fin au lieu d'utiliser un interval
             siteStates[site] = {
                 timeLeft: timeLimit,
                 endTime: Date.now() + (timeLimit * 1000)
@@ -68,16 +67,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             await chrome.storage.local.set({ siteStates });
             sendResponse({ success: true });
 
-            // Créer un seul interval pour tous les sites
-            if (!window.globalInterval) {
-                window.globalInterval = setInterval(async () => {
+            // Utiliser une variable globale du service worker
+            if (!globalThis.timerInterval) {
+                globalThis.timerInterval = setInterval(async () => {
                     const currentState = await chrome.storage.local.get(['siteStates']);
                     const updatedSiteStates = currentState.siteStates || {};
                     const now = Date.now();
 
                     let hasChanges = false;
 
-                    // Mettre à jour tous les timers
                     for (const [site, state] of Object.entries(updatedSiteStates)) {
                         if (state.endTime) {
                             const newTimeLeft = Math.ceil((state.endTime - now) / 1000);
