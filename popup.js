@@ -1,4 +1,3 @@
-// Suppression des fonctions inutiles startCountdown et countdown
 
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
@@ -40,14 +39,12 @@ function getCurrentTimer() {
 
 document.addEventListener('DOMContentLoaded', () => {
     getCurrentTimer();
-    // Mettre à jour l'affichage toutes les secondes
     setInterval(getCurrentTimer, 1000);
 
     document.getElementById('settings').addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
     });
 
-    // Charger l'état du Global mode
     chrome.storage.local.get('globalMode', function (data) {
         document.getElementById('global-mode-switch').checked = data.globalMode || false;
     });

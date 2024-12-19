@@ -13,9 +13,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             const globalMode = await getGlobaMode();
             const siteState = siteStates[matchedSite] || {};
 
-            // Vérifier le mode global d'abord
             if (globalMode) {
-                // Vérifier si n'importe quel site est en redirection
                 const anySiteInRedirection = Object.values(siteStates).some(
                     state => state.redirectUntil && now <= state.redirectUntil
                 );
@@ -29,7 +27,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 }
             }
 
-            // Continuer avec la logique normale si pas de redirection globale
             if (siteState.redirectUntil && now <= siteState.redirectUntil) {
                 if (redirectSites.length > 0) {
                     await chrome.tabs.update(tabId, {
@@ -67,7 +64,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             await chrome.storage.local.set({ siteStates });
             sendResponse({ success: true });
 
-            // Utiliser une variable globale du service worker
             if (!globalThis.timerInterval) {
                 globalThis.timerInterval = setInterval(async () => {
                     const currentState = await chrome.storage.local.get(['siteStates']);
