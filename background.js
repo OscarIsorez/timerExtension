@@ -77,10 +77,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
         const { timeLimit, tabId, site } = message;
 
-        chrome.storage.local.get(['siteStates', 'redirectMappings'], async (data) => {
+        chrome.storage.local.get(['siteStates'], async (data) => {
             try {
                 const siteStates = data.siteStates || {};
-                const redirectMappings = data.redirectMappings || {};
 
                 // Validate tab exists before proceeding
                 if (tabId && !(await isTabValid(tabId))) {
@@ -91,35 +90,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 siteStates[site] = {
                     timeLeft: timeLimit,
                     endTime: Date.now() + (timeLimit * 1000),
-                    tabId // Store tabId reference
+                    tabId,
+                    active: true // Add active flag
                 };
 
                 await chrome.storage.local.set({ siteStates });
                 sendResponse({ success: true });
 
+                // Set up timer interval if not already running
                 if (!globalThis.timerInterval) {
                     globalThis.timerInterval = setInterval(async () => {
                         try {
                             const currentState = await chrome.storage.local.get(['siteStates']);
                             const updatedSiteStates = currentState.siteStates || {};
                             const now = Date.now();
-
                             let hasChanges = false;
 
-                            // Filter out sites with invalid tabs
                             for (const [site, state] of Object.entries(updatedSiteStates)) {
-                                if (state.tabId && !(await isTabValid(state.tabId))) {
-                                    delete updatedSiteStates[site];
-                                    hasChanges = true;
-                                    continue;
-                                }
-
-                                if (state.endTime) {
+                                // Only update active timers
+                                if (state.active && state.endTime) {
                                     const newTimeLeft = Math.ceil((state.endTime - now) / 1000);
-
-                                    if (newTimeLeft <= 0 && !state.redirectUntil) {
+                                    
+                                    if (newTimeLeft <= 0) {
                                         state.timeLeft = 0;
                                         state.redirectUntil = now + (5 * 60 * 1000);
+                                        hasChanges = true;
+                                    } else {
+                                        state.timeLeft = newTimeLeft;
                                         hasChanges = true;
                                     }
                                 }
@@ -139,7 +136,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
         });
 
-        return true; // Keep message channel open for async response
+        return true; // Keep message channel open
     }
 });
 
@@ -180,19 +177,16 @@ function logStorageState() {
         console.log('Now:', Date.now());
         console.log('Redirect Mappings:', JSON.stringify(data.redirectMappings, null, 2));
         console.log('==================');
-
-
-
-
+        
     }, 1000
     );
 }
 
 
-async function setYtTimeLeft() {
+async function setTimeLeft(site) {
     chrome.storage.local.get(['siteStates'], (data) => {
         const siteStates = data.siteStates || {};
-        siteStates['youtube.com'] = {
+        siteStates[site] = {
             timeLeft: 0,
             endTime: Date.now(),
             redirectUntil: Date.now() + (5 * 60 * 1000),

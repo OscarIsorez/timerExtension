@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-document.getElementById('confirm').addEventListener('click', () => {
-    const minutes = parseInt(document.getElementById('minutes').value);
+function setTimer(minutes) {
     if (minutes > 0) {
         chrome.storage.local.get(['pendingUrl', 'pendingSite'], (data) => {
             if (data.pendingUrl && data.pendingSite) {
@@ -35,6 +34,19 @@ document.getElementById('confirm').addEventListener('click', () => {
             }
         });
     }
+}
+
+document.getElementById('confirm').addEventListener('click', () => {
+    const minutes = parseInt(document.getElementById('minutes').value);
+    setTimer(minutes);
+});
+
+// Add quick timer buttons handlers
+document.querySelectorAll('.quick-timer-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const minutes = parseInt(e.target.dataset.minutes);
+        setTimer(minutes);
+    });
 });
 
 document.getElementById('minutes').addEventListener('keypress', (event) => {
@@ -42,4 +54,3 @@ document.getElementById('minutes').addEventListener('keypress', (event) => {
         document.getElementById('confirm').click();
     }
 });
-    
