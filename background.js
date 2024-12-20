@@ -195,5 +195,7 @@ async function setTimeLeftDebug(site) {
         chrome.storage.local.set({ siteStates });
     });
 }
-// Démarrer le logging
+
+
+
 logStorageState();

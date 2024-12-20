@@ -14,18 +14,33 @@ redirectInput.addEventListener('input', () => {
 });
 
 function updateLists() {
-    chrome.storage.local.get(['controlled', 'redirect'], (data) => {
-        controlledList.innerHTML = data.controlled?.map(url => createListItem(url, 'controlled')).join('') || '';
+    chrome.storage.local.get(['controlled', 'redirect', 'siteStates'], (data) => {
+        controlledList.innerHTML = data.controlled?.map(url => createListItem(url, 'controlled', data.siteStates)).join('') || '';
         redirectList.innerHTML = data.redirect?.map(url => createListItem(url, 'redirect')).join('') || '';
         addEventListeners();
     });
     createMappingUI();
 }
-function createListItem(url, type) {
+
+function createListItem(url, type, siteStates = {}) {
+    let timeRemainingText = '';
+
+    if (type === 'controlled') {
+        const siteState = siteStates[url];
+        if (siteState && siteState.redirectUntil) {
+            const now = Date.now();
+            const timeRemaining = Math.ceil((siteState.redirectUntil - now) / 1000);
+            if (timeRemaining > 0) {
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                timeRemainingText = ` - Time left: ${minutes}m ${seconds}s`;
+            }
+        }
+    }
+
     return `
         <li>
-            ${url}
-            ${type === 'redirect' ? `<button class="go-btn" data-url="${url}">Go to</button>` : ''}
+            ${url}${timeRemainingText}
             <button class="delete-btn" data-url="${url}" data-type="${type}">Supprimer</button>
         </li>
     `;
@@ -181,5 +196,25 @@ function updateMapping(site, redirectUrl) {
         chrome.storage.local.set({ redirectMappings: mappings });
     });
 }
+
+
+async function resetTimeLeftDebug() {
+    const controlled_sites = await chrome.storage.local.get(['controlled']);
+    let siteStates = await chrome.storage.local.get('siteStates');
+    siteStates = siteStates.siteStates || {};
+    for (const site of controlled_sites.controlled) {
+        siteStates[site] = {
+            timeLeft: 0,
+        };
+    }
+    await chrome.storage.local.set({ siteStates });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('reset-time-left').addEventListener('click', async () => {
+        await resetTimeLeftDebug();
+        updateLists(); // Refresh the lists to reflect the changes
+    });
+});
 
 updateLists();
