@@ -123,28 +123,53 @@ function createMappingUI() {
     chrome.storage.local.get(['controlled', 'redirect', 'redirectMappings'], (data) => {
         const controlled = data.controlled || [];
         const redirect = data.redirect || [];
-        const mappings = data.redirectMappings || {};
-        
-        container.innerHTML = controlled.map(site => `
-            <div class="mapping-row">
-                <span>${site}</span>
-                <select data-site="${site}" class="redirect-select">
-                    ${redirect.map(url => `
-                        <option value="${url}" ${mappings[site] === url ? 'selected' : ''}>
-                            ${url}
-                        </option>
-                    `).join('')}
-                </select>
-            </div>
-        `).join('');
+        let mappings = data.redirectMappings || {};
 
-        // Add change listeners
-        document.querySelectorAll('.redirect-select').forEach(select => {
-            select.addEventListener('change', (e) => {
-                const site = e.target.dataset.site;
-                const redirectUrl = e.target.value;
-                updateMapping(site, redirectUrl);
+        // If only one redirect URL is present
+        if (redirect.length === 1) {
+            const redirectUrl = redirect[0];
+
+            // Assign the single redirect URL to all controlled sites without a mapping
+            controlled.forEach(site => {
+                if (!mappings[site]) {
+                    mappings[site] = redirectUrl;
+                }
             });
+
+            // Update chrome storage with new mappings
+            chrome.storage.local.set({ redirectMappings: mappings }, () => {
+                // Re-fetch mappings after update
+                chrome.storage.local.get(['redirectMappings'], (newData) => {
+                    mappings = newData.redirectMappings || {};
+                    renderMappings(controlled, redirect, mappings, container);
+                });
+            });
+        } else {
+            renderMappings(controlled, redirect, mappings, container);
+        }
+    });
+}
+
+function renderMappings(controlled, redirect, mappings, container) {
+    container.innerHTML = controlled.map(site => `
+        <div class="mapping-row">
+            <span>${site}</span>
+            <select data-site="${site}" class="redirect-select">
+                ${redirect.map(url => `
+                    <option value="${url}" ${mappings[site] === url ? 'selected' : ''}>
+                        ${url}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+    `).join('');
+
+    // Add change listeners
+    document.querySelectorAll('.redirect-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const site = e.target.dataset.site;
+            const redirectUrl = e.target.value;
+            updateMapping(site, redirectUrl);
         });
     });
 }
