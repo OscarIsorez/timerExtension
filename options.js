@@ -72,7 +72,6 @@ function removeUrl(url, type) {
     });
 }
 
-// Ajouter les event listeners pour la touche Enter
 document.getElementById('controlled-input').addEventListener('keyup', (event) => {
     if (event.key === 'Enter') {
         document.getElementById('add-controlled').click();
