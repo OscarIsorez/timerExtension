@@ -110,7 +110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                 // Only update active timers
                                 if (state.active && state.endTime) {
                                     const newTimeLeft = Math.ceil((state.endTime - now) / 1000);
-                                    
+
                                     if (newTimeLeft <= 0) {
                                         state.timeLeft = 0;
                                         state.redirectUntil = now + (5 * 60 * 1000);
@@ -136,7 +136,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
         });
 
-        return true; // Keep message channel open
+        return true;
     }
 });
 
@@ -177,13 +177,13 @@ function logStorageState() {
         console.log('Now:', Date.now());
         console.log('Redirect Mappings:', JSON.stringify(data.redirectMappings, null, 2));
         console.log('==================');
-        
+
     }, 1000
     );
 }
 
 
-async function setTimeLeft(site) {
+async function setTimeLeftDebug(site) {
     chrome.storage.local.get(['siteStates'], (data) => {
         const siteStates = data.siteStates || {};
         siteStates[site] = {
