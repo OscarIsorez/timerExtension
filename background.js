@@ -20,18 +20,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 console.log('Any site in redirection:', anySiteInRedirection);
 
                 if (anySiteInRedirection && redirectSites.length > 0) {
-                    await chrome.tabs.update(tabId, {
-                        url: redirectSites[0]
-                    });
+                    await handleRedirect(tabId, redirectSites[0]);
+
                     return;
                 }
             }
 
             if (siteState.redirectUntil && now <= siteState.redirectUntil) {
                 if (redirectSites.length > 0) {
-                    await chrome.tabs.update(tabId, {
-                        url: redirectSites[0]
-                    });
+                    await handleRedirect(tabId, redirectSites[0]);
+
                     return;
                 }
             }
@@ -48,6 +46,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         }
     }
 });
+
+
+async function handleRedirect(currentTabId, redirectUrl) {
+    // Close current tab
+    await chrome.tabs.remove(currentTabId);
+
+    // Open new tab with redirect URL and focus on it
+    await chrome.tabs.create({
+        url: redirectUrl,
+        active: true // This makes the tab focused
+    });
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'setTimeLimit') {
@@ -84,7 +94,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                 const redirectData = await chrome.storage.local.get(['redirect']);
                                 const redirectSites = redirectData.redirect || [];
                                 if (redirectSites.length > 0) {
-                                    chrome.tabs.update(tabId, { url: redirectSites[0] });
+                                    await handleRedirect(tabId, redirectSites[0]);
                                 }
                             } else if (newTimeLeft > 0) {
                                 state.timeLeft = newTimeLeft;
