@@ -89,3 +89,19 @@ button:hover {
     cursor: grab;
     margin-right: 10px;
 }
+
+.mapping-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    margin: 5px 0;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.redirect-select {
+    width: 60%;
+    padding: 4px;
+    border-radius: 4px;
+}

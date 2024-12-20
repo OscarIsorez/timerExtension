@@ -19,6 +19,7 @@ function updateLists() {
         redirectList.innerHTML = data.redirect?.map(url => createListItem(url, 'redirect')).join('') || '';
         addEventListeners();
     });
+    createMappingUI();
 }
 function createListItem(url, type) {
     return `
@@ -116,5 +117,44 @@ document.getElementById('add-redirect').addEventListener('click', () => {
     redirectInput.value = 'https://www.example.com';
     hideErrorMessage(redirectErrorMessage);
 });
+
+function createMappingUI() {
+    const container = document.getElementById('mapping-container');
+    chrome.storage.local.get(['controlled', 'redirect', 'redirectMappings'], (data) => {
+        const controlled = data.controlled || [];
+        const redirect = data.redirect || [];
+        const mappings = data.redirectMappings || {};
+        
+        container.innerHTML = controlled.map(site => `
+            <div class="mapping-row">
+                <span>${site}</span>
+                <select data-site="${site}" class="redirect-select">
+                    ${redirect.map(url => `
+                        <option value="${url}" ${mappings[site] === url ? 'selected' : ''}>
+                            ${url}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+        `).join('');
+
+        // Add change listeners
+        document.querySelectorAll('.redirect-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const site = e.target.dataset.site;
+                const redirectUrl = e.target.value;
+                updateMapping(site, redirectUrl);
+            });
+        });
+    });
+}
+
+function updateMapping(site, redirectUrl) {
+    chrome.storage.local.get(['redirectMappings'], (data) => {
+        const mappings = data.redirectMappings || {};
+        mappings[site] = redirectUrl;
+        chrome.storage.local.set({ redirectMappings: mappings });
+    });
+}
 
 updateLists();
