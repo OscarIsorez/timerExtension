@@ -27,9 +27,9 @@ function createListItem(url, type, siteStates = {}) {
 
     if (type === 'controlled') {
         const siteState = siteStates[url];
-        if (siteState && siteState.redirectUntil) {
+        if (siteState && siteState.endTime) {
             const now = Date.now();
-            const timeRemaining = Math.ceil((siteState.redirectUntil - now) / 1000);
+            const timeRemaining = Math.ceil((siteState.endTime - now) / 1000);
             if (timeRemaining > 0) {
                 const minutes = Math.floor(timeRemaining / 60);
                 const seconds = timeRemaining % 60;

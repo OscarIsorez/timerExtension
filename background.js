@@ -26,7 +26,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
             if (globalMode) {
                 const anySiteInRedirection = Object.values(siteStates).some(
-                    state => state.redirectUntil && now <= state.redirectUntil
+                    state => state.endTime && now <= state.endTime
                 );
                 console.log('Any site in redirection:', anySiteInRedirection);
 
@@ -38,7 +38,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 }
             }
 
-            if (siteState.redirectUntil && now <= siteState.redirectUntil) {
+            if (siteState.endTime && now <= siteState.endTime) {
                 if (redirectSites.length > 0) {
                     const redirectUrl = redirectMappings[matchedSite] || redirectSites[0];
                     await handleRedirect(tabId, redirectUrl);
@@ -97,7 +97,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 await chrome.storage.local.set({ siteStates });
                 sendResponse({ success: true });
 
-                // Set up timer interval if not already running
                 if (!globalThis.timerInterval) {
                     globalThis.timerInterval = setInterval(async () => {
                         try {
@@ -107,13 +106,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             let hasChanges = false;
 
                             for (const [site, state] of Object.entries(updatedSiteStates)) {
-                                // Only update active timers
                                 if (state.active && state.endTime) {
                                     const newTimeLeft = Math.ceil((state.endTime - now) / 1000);
 
                                     if (newTimeLeft <= 0) {
                                         state.timeLeft = 0;
-                                        state.redirectUntil = now + (5 * 60 * 1000);
+                                        state.timeLeft = now + (5 * 60 * 1000);
                                         hasChanges = true;
                                     } else {
                                         state.timeLeft = newTimeLeft;
@@ -151,7 +149,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (matchedSite && siteStates[matchedSite]) {
                 sendResponse({
                     timeLeft: Math.ceil(siteStates[matchedSite].timeLeft),
-                    redirectUntil: siteStates[matchedSite].redirectUntil
+                    timeLeft: siteStates[matchedSite].timeLeft
                 });
             } else {
                 sendResponse({ timeLeft: undefined });
@@ -189,7 +187,7 @@ async function setTimeLeftDebug(site) {
         siteStates[site] = {
             timeLeft: 0,
             endTime: Date.now(),
-            redirectUntil: Date.now() + (5 * 60 * 1000),
+            timeLeft: Date.now() + (5 * 60 * 1000),
             tabId: 1
         };
         chrome.storage.local.set({ siteStates });
