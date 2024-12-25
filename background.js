@@ -38,7 +38,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 }
             }
 
-            if (siteState.endTime && now <= siteState.endTime) {
+            if (siteState.endTime && now <= siteState.endTime && siteState.timeLeft == 0) {
                 if (redirectSites.length > 0) {
                     const redirectUrl = redirectMappings[matchedSite] || redirectSites[0];
                     await handleRedirect(tabId, redirectUrl);
